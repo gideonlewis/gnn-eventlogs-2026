@@ -1,0 +1,5 @@
+Length Range,Rank1_Node,Rank1_Dominance,Rank1_MeanImp,Rank2_Node,Rank2_Dominance,Rank2_MeanImp,Rank3_Node,Rank3_Dominance,Rank3_MeanImp
+0-4,2,85.51,0.4624,1,69.57,0.1299,0,67.52,0.0
+5-9,4,81.77,0.6948,3,75.21,0.3992,2,50.14,0.1249
+10-14,8,70.0,0.7345,7,40.0,0.5499,5,30.0,0.3303
+15-19,13,100.0,0.8142,12,100.0,0.6083,8,100.0,0.2335

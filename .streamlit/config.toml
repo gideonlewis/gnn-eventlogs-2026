@@ -1,0 +1,19 @@
+[server]
+# Dùng "poll" thay vì inotify/kqueue để tránh fork khi PyTorch đã được load
+# (fork sau khi torch init → OpenMP/BLAS threads conflict → SIGSEGV)
+fileWatcherType = "poll"
+headless = false
+enableCORS = false
+enableXsrfProtection = true
+
+[runner]
+# Tắt fast reruns để tránh race condition trong torch C++ threads
+fastReruns = false
+# Giới hạn message size (mặc định 200MB quá lớn cho app nhỏ)
+enforceSerializableSessionState = false
+
+[browser]
+gatherUsageStats = false
+
+[logger]
+level = "warning"
