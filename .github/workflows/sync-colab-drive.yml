@@ -1,0 +1,83 @@
+name: Sync Colab notebooks to Google Drive
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**/*.ipynb"
+      - "src/**/*.py"
+      - "config/**"
+      - "requirements*.txt"
+      - "pyproject.toml"
+      - ".github/workflows/sync-colab-drive.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: sync-colab-drive-main
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: Upload notebooks and runtime files
+    runs-on: ubuntu-latest
+    env:
+      GDRIVE_FOLDER_ID: ${{ vars.GDRIVE_FOLDER_ID }}
+      GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Google Drive settings
+        run: |
+          test -n "$GDRIVE_FOLDER_ID" || {
+            echo "Repository variable GDRIVE_FOLDER_ID is required."
+            exit 1
+          }
+          test -n "$GDRIVE_SERVICE_ACCOUNT_JSON" || {
+            echo "Repository secret GDRIVE_SERVICE_ACCOUNT_JSON is required."
+            exit 1
+          }
+
+      - name: Install rclone
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rclone rsync
+
+      - name: Prepare upload bundle
+        run: |
+          STAGING="$RUNNER_TEMP/colab-drive-sync"
+          mkdir -p "$STAGING"
+
+          rsync -av \
+            --include='*/' \
+            --include='*.ipynb' \
+            --include='*.py' \
+            --include='requirements*.txt' \
+            --include='pyproject.toml' \
+            --include='config/***' \
+            --exclude='.ipynb_checkpoints/***' \
+            --exclude='__pycache__/***' \
+            --exclude='*' \
+            ./ "$STAGING/"
+
+          find "$STAGING" -type f | sort
+
+      - name: Configure rclone Google Drive remote
+        run: |
+          SERVICE_ACCOUNT_FILE="$RUNNER_TEMP/gdrive-service-account.json"
+          printf '%s' "$GDRIVE_SERVICE_ACCOUNT_JSON" > "$SERVICE_ACCOUNT_FILE"
+
+          rclone config create colab_drive drive \
+            scope drive \
+            service_account_file "$SERVICE_ACCOUNT_FILE" \
+            root_folder_id "$GDRIVE_FOLDER_ID"
+
+      - name: Sync bundle to Google Drive
+        run: |
+          STAGING="$RUNNER_TEMP/colab-drive-sync"
+          rclone sync "$STAGING/" colab_drive: \
+            --create-empty-src-dirs \
+            --drive-acknowledge-abuse \
+            --progress
