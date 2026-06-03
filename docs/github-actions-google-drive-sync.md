@@ -28,7 +28,7 @@ Create this secret:
 
 | Name | Value |
 | --- | --- |
-| `GDRIVE_SERVICE_ACCOUNT_JSON` | The full JSON key for a Google Cloud service account that has access to the target Google Drive folder. |
+| `GDRIVE_SERVICE_ACCOUNT_JSON` | The full JSON key for a Google Cloud service account that has access to the target Google Drive folder.. |
 
 ### Repository Variables
 
@@ -50,7 +50,7 @@ For that URL, set:
 GDRIVE_FOLDER_ID=1AbCdEfGhIjKlMnOpQrStUvWxYz
 ```
 
-## Google Drive setup
+## Google Drive setup`
 
 1. In Google Cloud Console, create or choose a project.
 2. Enable the Google Drive API for that project.
