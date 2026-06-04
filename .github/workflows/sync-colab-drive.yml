@@ -21,10 +21,11 @@ jobs:
   sync:
     name: Upload notebooks and runtime files
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     env:
       GDRIVE_FOLDER_ID: ${{ vars.GDRIVE_FOLDER_ID }}
-      GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
-      GDRIVE_RCLONE_TOKEN: ${{ secrets.GDRIVE_RCLONE_TOKEN }}
+      GDRIVE_RCLONE_CONF: ${{ secrets.GDRIVE_RCLONE_CONF }}
 
     steps:
       - name: Checkout repository
@@ -36,10 +37,11 @@ jobs:
             echo "Repository variable GDRIVE_FOLDER_ID is required."
             exit 1
           }
-          if [ -z "$GDRIVE_RCLONE_TOKEN" ] && [ -z "$GDRIVE_SERVICE_ACCOUNT_JSON" ]; then
-            echo "Set repository secret GDRIVE_RCLONE_TOKEN for personal My Drive OAuth, or GDRIVE_SERVICE_ACCOUNT_JSON for Shared Drive/service-account sync."
+
+          test -n "$GDRIVE_RCLONE_CONF" || {
+            echo "Repository secret GDRIVE_RCLONE_CONF is required."
             exit 1
-          fi
+          }
 
       - name: Install rclone
         run: |
@@ -52,14 +54,20 @@ jobs:
           mkdir -p "$STAGING"
 
           mkdir -p "$STAGING/src"
-          rsync -av \
-            --exclude='.ipynb_checkpoints/***' \
-            --exclude='__pycache__/***' \
-            --include='*/' \
-            --include='*.ipynb' \
-            --include='*.py' \
-            --exclude='*' \
-            src/ "$STAGING/src/"
+
+          if [ -d src ]; then
+            rsync -av \
+              --exclude='.ipynb_checkpoints/***' \
+              --exclude='__pycache__/***' \
+              --include='*/' \
+              --include='*.ipynb' \
+              --include='*.py' \
+              --exclude='*' \
+              src/ "$STAGING/src/"
+          else
+            echo "Directory src/ does not exist."
+            exit 1
+          fi
 
           if [ -d config ]; then
             rsync -av config/ "$STAGING/config/"
@@ -70,30 +78,24 @@ jobs:
             -name 'pyproject.toml' \
           \) -exec cp {} "$STAGING/" \;
 
+          echo "Prepared upload bundle:"
           find "$STAGING" -type f | sort
 
       - name: Configure rclone Google Drive remote
         run: |
-          if [ -n "$GDRIVE_RCLONE_TOKEN" ]; then
-            rclone config create colab_drive drive \
-              scope drive \
-              token "$GDRIVE_RCLONE_TOKEN" \
-              root_folder_id "$GDRIVE_FOLDER_ID"
-            exit 0
-          fi
+          mkdir -p ~/.config/rclone
 
-          SERVICE_ACCOUNT_FILE="$RUNNER_TEMP/gdrive-service-account.json"
-          printf '%s' "$GDRIVE_SERVICE_ACCOUNT_JSON" > "$SERVICE_ACCOUNT_FILE"
+          printf '%s' "$GDRIVE_RCLONE_CONF" > ~/.config/rclone/rclone.conf
 
-          rclone config create colab_drive drive \
-            scope drive \
-            service_account_file "$SERVICE_ACCOUNT_FILE" \
-            root_folder_id "$GDRIVE_FOLDER_ID"
+          echo "Checking rclone remote..."
+          rclone config show colab_drive --config ~/.config/rclone/rclone.conf >/dev/null
 
       - name: Sync bundle to Google Drive
         run: |
           STAGING="$RUNNER_TEMP/colab-drive-sync"
+
           rclone sync "$STAGING/" colab_drive: \
             --create-empty-src-dirs \
             --drive-acknowledge-abuse \
             --progress
+
